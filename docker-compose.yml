@@ -1,0 +1,43 @@
+version: "3.7"
+
+services:
+  db-example:
+    container_name: db-example
+    image: mysql:8.0
+    restart: always
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: development
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysqldata:/var/lib/mysql
+    networks:
+      - api-dev
+
+  api-example:
+    container_name: api-example
+    build:
+      context: ./
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8012:80"
+      - "9003:9003"
+    restart: always
+    depends_on:
+      - db-example
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./:/var/www/html/app
+    networks:
+      - api-dev
+
+networks:
+  api-dev:
+    driver: bridge
+
+volumes:
+  mysqldata:

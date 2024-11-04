@@ -1,0 +1,82 @@
+FROM php:8.2-fpm
+
+# Dependencies
+RUN apt-get update && apt-get install -y \
+    cron \
+    procps \
+    build-essential \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    locales \
+    libzip-dev \
+    libxslt-dev \
+    libmcrypt-dev \
+    libonig-dev \
+    zlib1g-dev \
+    icu-devtools\
+    zip \
+    jpegoptim optipng pngquant gifsicle \
+    libkrb5-dev \
+    git \
+    graphviz \
+    curl \
+    supervisor \
+    libssl-dev pkg-config \
+    nginx g++ libpng-dev gettext \
+    software-properties-common \
+    npm
+
+# plugins
+RUN docker-php-ext-install bcmath exif mysqli pcntl sockets xsl opcache pdo_mysql gd gettext shmop soap sysvmsg sysvsem sysvshm pdo calendar intl zip
+
+# Configure Plugin
+RUN docker-php-ext-configure calendar
+RUN docker-php-ext-configure intl
+RUN docker-php-ext-configure zip
+
+# #Install Redis
+# RUN pecl install redis && docker-php-ext-enable redis
+
+# Installing composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Clear cache
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# #Install Elastic Apm Client
+# RUN curl -fsSL https://github.com/elastic/apm-agent-php/releases/download/v1.10.0/apm-agent-php_1.10.0_all.deb > /tmp/apm-gent-php.deb \
+#     && dpkg -i /tmp/apm-gent-php.deb
+
+# Configurar Cache
+COPY docker/php/custom.ini /usr/local/etc/php/conf.d/custom.ini
+COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+
+# Importe projeto
+WORKDIR /var/www/html/app
+COPY . /var/www/html/app
+RUN composer install --quiet --optimize-autoloader
+
+# Configura Nginx
+COPY docker/nginx/api.conf /etc/nginx/sites-enabled/default
+
+#Copy crontab file to the cron.d directory
+RUN echo "*/2 * * * * root php /var/www/html/app/artisan schedule:run >> /var/log/cron.out.log 2>&1" >> /etc/crontab
+RUN touch /var/log/cron.out.log
+
+# Permissions
+RUN chown -R $USER:www-data /var/www/html/app/storage/
+RUN chmod -R 777 /var/www/html/app/storage/
+
+RUN mkdir /var/www/.local
+RUN chmod -R 777 /var/www/.local/
+
+RUN mkdir /var/log/php
+
+EXPOSE 80
+
+COPY docker/php/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+COPY docker/supervisord/supervisord.ini /etc/supervisord.conf
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
