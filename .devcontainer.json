@@ -1,7 +1,7 @@
 {
-  "name": "API Monitor",
+  "name": "API Example",
   "dockerComposeFile": "docker-compose.yml",
-  "service": "api-monitor",
+  "service": "api-example",
   "remoteUser": "root",
   "workspaceFolder": "/var/www/html/app",
   "customizations": {
